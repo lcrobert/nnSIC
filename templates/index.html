@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-tw">
+<head>
+  <meta charset="UTF-8">
+  <title>Spectrum Image Recognition API</title>
+  <style>
+     body {background-color: white;line-height: 1.7em; 
+	       font-family: Arial, "文泉驛正黑", "WenQuanYi Zen Hei", "儷黑 Pro", "LiHei Pro", "微軟正黑體", "Microsoft JhengHei", sans-serif;}
+  </style>	
+</head>
+
+<body>
+
+<a href="/" title="Home" style="text-decoration:none;">
+ <h1 style="color:chartreuse; text-align:center">Spectrum Image Recognition API</h1>
+</a>
+
+<!-- === Work_area === -->
+<div style="margin:0px auto; width: 472px; border-width: 3px; border-style: solid; border-color: #FFAC55; padding: 12px; border-radius: 6px;">
+   {{ descriptions | safe }}
+</div>
+
+<br>
+
+<form  name = "form" action="{% url 'index' %}" method="POST" enctype="multipart/form-data">{% csrf_token %}
+    <div style="text-align:center; font-size: 18px;">
+        Please select spectrum image (.jpg or .png file)<br>
+        <input type='file' name='selected_img'>
+        <br><br>
+        <input type="submit" id="uploadIMG" name="UPLOADimg" value="UPLOAD" style="width: 130px; height: 43px; font-size: 18px;">
+    </div>
+</form>
+
+<br>
+
+<div style="text-align:center; font-size: 12px;">
+{{ upload_state | safe }}
+</div>
+<div style="text-align:center; font-size: 18px;">
+{{ recognize_result | safe }}
+</div>
+
+<br>
+
+</body>
+</html>
