@@ -13,7 +13,7 @@ def PlotConfusionMatrix(cm, show=True, savepath='', tick_name=''):
     label_size = cm.shape[0]
     
     fig, ax = plt.subplots()   
-    cm_img = ax.matshow(cm,cmap='copper')#copper is better
+    cm_img = ax.matshow(cm,cmap='coolwarm')#copper is better or 'coolwarm'
     fig.colorbar(cm_img)
     ax.set_title('ConfusionMatrix',fontdict={'fontsize':15})
     ax.set_ylabel('True')
@@ -134,6 +134,104 @@ def LoadGraphFromPB(pbfile_path):
         """
     graph = tf.get_default_graph()   
     return graph
+
+
+class OnlineModel(object):
+    import ImgPreprocessSingle as ips 
+    
+    def __init__(self,mdpath):
+        self.mdpath = mdpath  
+        self.init_imgpath = os.path.join(os.getcwd(),'spapi','static','tf_models','init.png')        
+
+        print('-------------------------------------------')    
+        print('Online-Model init...')        
+        StartTime = datetime.now()        
+        tf.reset_default_graph()
+        self.graph = LoadGraphFromPB(self.mdpath)
+        self.x_img = self.graph.get_tensor_by_name('import/InputData/x_img:0')
+        self.keep_prob = self.graph.get_tensor_by_name('import/dropout:0')
+        self.output_prob = self.graph.get_tensor_by_name('import/Output-Classification-layer/output_softmax/Softmax:0')
+        self.output_label = self.graph.get_tensor_by_name('import/ArgMax:0')
+        self.sess = tf.Session()        
+        _, _ = self.pred(self.init_imgpath)        
+        EndTime = datetime.now() 
+        print ('Time usage : %s '%str(EndTime-StartTime))
+        print('-------------------------------------------')
+
+    
+    def pred(self, img_path, print_result=False):
+        path = img_path  
+        img = self.ips.img_preprocess(imgpath=path, savepath='', new_shape=(480,15), auto_flip=False, plot=False)    
+        
+        if img is not '': 
+           image_shape = img.shape 
+           img = img.reshape((-1, image_shape[0], image_shape[1], 3))           
+           label, prob = self.sess.run([self.output_label,self.output_prob], 
+                                   feed_dict = {self.x_img: img*(1./255), 
+                                                self.keep_prob: 1.0})  
+           if print_result:             
+              print('PrediLabel  =', label[0])
+              print('Probability =',['%.2f'%(p) for p in prob[0]])
+           return label[0], prob[0]
+        else:        
+           return None, None
+
+
+def ConfusionMatrixAnalysis(cm,f1_beta=1):
+    """
+    calculate
+      precision, recall, f1, support, specificity, weighted_avg
+    plot
+     ROC: recall vs 1-specificity    
+    """
+    label_size = len(cm[0])
+    cm_total = np.sum(cm)
+    cm_sum_diagonal = np.sum(np.diagonal(cm))
+    cm_acc = cm_sum_diagonal/cm_total
+    
+    precision = np.asarray([ cm[i,i]/np.sum(cm[:,i]) for i in range(label_size) ])
+    recall = np.asarray([ cm[i,i]/np.sum(cm[i,:]) for i in range(label_size) ])
+    f1_score = (1+f1_beta**2)*(precision*recall/(f1_beta**2*precision+recall))#beta=1
+    support = np.sum(cm,axis=1)
+    # specificity = FPR = TN/(TN+FP) # 在其他人中也預測為其他人的數量 / 自己以外(其他人)的true label數量
+    specificity = np.asarray([(np.sum(cm)-np.sum(cm[:,i])-np.sum(cm[i,:])+np.sum(cm[i,i]))/(np.sum(cm)-np.sum(cm[i,:])) for i in range(label_size)])
+    # weighted_avg = sum(P*N) / sum(N) 
+    weighted_precision = np.sum(precision*support)/np.sum(support)
+    weighted_recall = np.sum(recall*support)/np.sum(support)
+    weighted_f1_score = np.sum(f1_score*support)/np.sum(support)
+
+    # micro_avg-precision = sum(TP) / sum(TP+FP) for each label 
+    # sum(TP) = cm_sum_diagonal
+    # sum(TP+FP) = sum ( sum(cm[:,i]) ) = cm_total
+    #micro_precision = cm_sum_diagonal/cm_total #equal to cm_acc 
+
+    # micro_avg-recall = sum(TP) / sum(TN+TP) for each label
+    # sum(TN+TP) = sum ( sum(cm[i,:]) ) = cm_total
+    #micro_recall = cm_sum_diagonal/cm_total 
+
+    # macro_avg = not useful for imbalance data   
+    #macro_score = [np.mean(precision), np.mean(recall), np.mean(f1_score)]
+
+
+    report = ""
+    report += "Total Acc : %.4f \n    "%(cm_acc)
+    report += "   ".join(["precision","   recall"," f1_score"," support"]) + "\n"
+    for i in range(label_size):
+      report += "%2d     "%(i)    
+      report += "      ".join([ "%.4f"%v for v in [precision[i],recall[i],f1_score[i]]])        
+      report += "      %5d"%(support[i])+"\n"     
+    report += "\nw_avg"
+    report += "  " + "%.4f      %.4f      %.4f"%(weighted_precision,weighted_recall,weighted_f1_score)
+    report +="      %5d \n"%(np.sum(support))
+
+    result = {"report":report,
+              "precision":precision,
+              "recall":recall,
+              "f1_score":f1_score,
+              "support":support,
+              "specificity":specificity}
+
+    return result
 
 
 if __name__ == '__main__':
