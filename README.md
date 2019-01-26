@@ -72,7 +72,7 @@ CNN、TensorFlow 的好機會，以這真實的case，完整實踐從資料收�
 
 ## 資料集
 
-#### 影像來源及分類
+### 影像來源及分類
 
 專案所使用到的光譜影像少部分來自於我個人收集，大部分則是來自 [SpectralWorkbench](https://spectralworkbench.org/) 網站。在這
 
@@ -84,7 +84,7 @@ CNN、TensorFlow 的好機會，以這真實的case，完整實踐從資料收�
 
 坑。這些分類整理的細節可以參考  *s1_LabelImage.py*，整理前後的資料都會放在 RawData 目錄中。
 
-#### 影像前處理
+### 影像前處理
 
 光譜影像最主要的特徵就是其沿著光譜色散方向的光強度變化，也就是說並不需要整張影像去做辨識，
 
@@ -98,7 +98,7 @@ CNN、TensorFlow 的好機會，以這真實的case，完整實踐從資料收�
 
 InputData 目錄中 並將影像路徑及對應的標籤另存成 .csv檔。
 
-#### 生成訓練集、驗證集、測試集 
+### 生成訓練集、驗證集、測試集 
 
 1. 首先確認資料集的標籤數量分布情形，評估是否需要做標籤更換。會有此考量是因為一是方便機動
 
@@ -176,7 +176,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 
 ## 訓練 
 
-#### 資料輸入
+### 資料輸入
 
 基本上是參考[官方文件](https://www.tensorflow.org/guide/datasets)中的 dataset 寫法，把訓練中會用到的各個資料集讀取流程，包裝成一個統一的
 
@@ -194,7 +194,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 
 關於資料輸入流程及 TFrecord 檔案的讀取應用，都寫在 *ReadTFRecords.py* 中。
 
-#### 訓練流程
+### 訓練流程
 
 這部分還沒想好要怎麼寫比較好，就直接以程式碼來說明了。
 
@@ -314,7 +314,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
        model.saver.save(model.sess, model_savepath)        
    ```
 
-3.  跑測試集
+3. 跑測試集
 
    ```python
    def RunTestSet(model,data,save=True):     
@@ -343,7 +343,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 ## 模型在TestSet上的表現
 
 <img width="510" src="https://lcycblog.files.wordpress.com/2019/01/confusionmatrix.png">
-<img width="520" src="https://lcycblog.files.wordpress.com/2019/01/cm_ana.png"><br/><br/>
+<img width="520" src="https://lcycblog.files.wordpress.com/2019/01/cm_ana.png"><br/>
 
 在自動波長校正這件事情上，比較重視的是預測結果的精確性，因為校正錯誤比無法校正還嚴重，無法
 
@@ -353,7 +353,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 
 這兩個類別的 f1_score 也會是考量的點。<br/>
 
-#### 同場加映 : 對於真正未知影像的預測結果
+### 同場加映 : 對於真正未知影像的預測結果
 
 因為有 PySA WebApp 的關係，我手上有一些來自於外部 ( aka 未來的潛在使用者 ) 的光譜影像，這些影
 
@@ -379,7 +379,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 
 <br/>
 
-#### 製作可用於部署的 .pb file
+### 製作可用於部署的 .pb file
 
 如果只需要模型給出預測，而沒有要再度訓練模型，那就把模型內的參數凍結，只取出預測所需要的參
 
@@ -389,7 +389,7 @@ Input 進來後，首先會連續經過 5 層包含 batch normalization 及 ReLU
 
  *RestoreModelVariable* 、 *FreezeGraphToPB*  方法。
 
-#### 製作 API
+### 製作 API
 
 這邊我是用 Django 製作， 簡單的 demo code 可以參考 *s6_DeployWithDjango.py*  以及 *ModelTools.py* 
 
