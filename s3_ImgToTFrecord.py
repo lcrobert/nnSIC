@@ -154,9 +154,9 @@ def re_sampling(tra_images,tra_labels,tra_label_counts,label_min_counts=400,labe
 if __name__ == "__main__":
     
   # Setting TFRecords file save path        
-  train_path = os.path.join(input_main_path,'MyDataV2_train.tfrecords')   
-  vali_path = os.path.join(input_main_path,'MyDataV2_vali.tfrecords')   
-  test_path = os.path.join(input_main_path,'MyDataV2_test.tfrecords')   
+  train_path = os.path.join(input_main_path,'MyDataV5_train.tfrecords')   
+  vali_path = os.path.join(input_main_path,'MyDataV5_vali.tfrecords')   
+  test_path = os.path.join(input_main_path,'MyDataV5_test.tfrecords')   
         
   # Read input .csv data    
   input_csv_path= os.path.join(input_main_path,'Image_Preprocessed_list.csv')   
@@ -176,7 +176,7 @@ if __name__ == "__main__":
   # Randoming data shuffle in-place  
   images, labels = shuffle_data(path_list,label_list)  
   # Seperate data to training-set and test-set  
-  train_test_ratio = 0.9
+  train_test_ratio = 0.8
   tra_images,tra_labels,test_images,test_labels = trim_data_2parts(train_test_ratio,images,labels)     
   # Check and get the distribution of training-set and test-set 
   tra_label_counts = counter_label(tra_labels,'tra_labels') 
@@ -184,12 +184,12 @@ if __name__ == "__main__":
 
   ###########################################################
   # Re-sampling training-set to match the label_min_counts
-  label_min_counts=400    
+  label_min_counts=480    
   tra_images, tra_labels = re_sampling(tra_images,tra_labels,tra_label_counts,label_min_counts=label_min_counts)   
   ###########################################################
 
   # Seperate training-set to training-set and validation-set   
-  train_vali_ratio = 0.9
+  train_vali_ratio = 0.8
   train_images,train_labels,vali_images,vali_labels = trim_data_2parts(train_vali_ratio,tra_images,tra_labels)     
   # Check the distribution of training-set validation-set and test-set  
   train_label_counts = counter_label(train_labels,'final train_labels') 
@@ -205,35 +205,36 @@ if __name__ == "__main__":
      data_to_TFRecords(vali_path, vali_images, vali_labels, flip_v=True)
      data_to_TFRecords(test_path, test_images, test_labels, flip_v=False)
      print ('------------------------------')
-     chk_point = input("Check all-set of TFRecord files [y/n]?")
+     chk_point = input("Check TFRecord files [y/n]?")
      if chk_point == 'y':
-        from ReadTFRecords import chk_TFRecords_file
+        from ReadTFRecords import ChkTFRecordsFile
         for filepath in [train_path,vali_path,test_path]:
-            my_data = chk_TFRecords_file(filepath,batch_size=4,plot=True)
-            print (filepath.replace("\\","/").split("/")[-1])            
-            for key,value in my_data.items(): 
-                print (key ,':', value)     
-            print ('------------------------------')    
+            file = ChkTFRecordsFile(filepath,batch_size=4)
+            data = file.get_data(show_info=True,plot=True)
      else:
-        print ("Skip check TFRecord file") 
+        print ("Skip check TFRecord files") 
   else:
-     print ("Skip creat TFRecords file") 
-     chk_point = input("Check a TFRecord file [y/n]?")
+     print ("Skip creat TFRecords files") 
+     chk_point = input("Do you want to get all data from another TFRecord file [y/n]?")
      if chk_point == 'y':         
-        from ReadTFRecords import chk_TFRecords_file
-        fnmae = input("Please input one TFRecords file name : \n")
-        file_path = os.path.join(input_main_path,fnmae)   
-        if os.path.exists(file_path) and fnmae != '' and ' ' not in fnmae:                                       
+        from ReadTFRecords import ChkTFRecordsFile
+        fname = input("The TFRecords file name : \n")
+        file_path = os.path.join(input_main_path,fname)   
+        if os.path.exists(file_path) and fname != '' and ' ' not in fname:                                       
            try: 
-              my_data = chk_TFRecords_file(file_path,batch_size=4,plot=True)
-              for key,value in my_data.items(): 
-                  print (key ,':', value)           
+              file = ChkTFRecordsFile(file_path)
+              data = file.get_all_data()         
+              print ("""
+                     Use data['key'] to get data (key : img, label, filename, imgsize, datasize)
+                     Use file.count_label(data['label']) to show label distribution 
+                     Use file.plot_imgs(data['img'][m:n]) to plot images
+                     """)
            except Exception as e:
                print (e)
         else:
-           print ("The file dos not exist. \nSkip check TFRecord file ")            
+           print ("The file dos not exist. \nSkip check another TFRecord file ")            
      else:
-        print ("Skip check TFRecord file") 
+        print ("Skip check another TFRecord file") 
  
   
 
