@@ -9,11 +9,13 @@ import tensorflow as tf
 import matplotlib.pyplot as plt 
 from datetime import datetime
 
-def PlotConfusionMatrix(cm, show=True, savepath='', tick_name=''):
+       
+
+def PlotConfusionMatrix(cm, show=True, savepath='',tick_name='', cmap='copper', colab=False):
     label_size = cm.shape[0]
     
     fig, ax = plt.subplots()   
-    cm_img = ax.matshow(cm,cmap='coolwarm')#copper is better or 'coolwarm'
+    cm_img = ax.matshow(cm,cmap=cmap)#copper is better or 'coolwarm'
     fig.colorbar(cm_img)
     ax.set_title('ConfusionMatrix',fontdict={'fontsize':15})
     ax.set_ylabel('True')
@@ -32,7 +34,8 @@ def PlotConfusionMatrix(cm, show=True, savepath='', tick_name=''):
         spine.set_visible(False)
     ax.set_xticks(tick_loc[0:-1]+0.5, minor = True)
     ax.set_yticks(tick_loc[0:-1]+0.5, minor = True)        
-    ax.grid(which="minor", color="w", linestyle='-', linewidth=2)    
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=2)
+    if colab: ax.grid(which='major', visible=False) # Setting only for using CoLab    
     # Loop over data dimensions and create text annotations.
     for i in range(label_size):
         for j in range(label_size):
@@ -47,52 +50,57 @@ def PlotConfusionMatrix(cm, show=True, savepath='', tick_name=''):
        plt.close()
        return fig
 
+def FigToSummary(fig, tag): 
+    """
+    Adapted from https://github.com/wookayin/tensorflow-plot/blob/master/tfplot/figure.py
+    Convert a matplotlib figure ``fig`` into a TensorFlow Summary object
+    that can be directly fed into ``Summary.FileWriter``.
+      >>> fig, ax = ...
+      >>> summary = Fig2summary(fig, tag='MyFigure/image')
+      >>> summary_writer.add_summary(summary, global_step)
+    """
+    from io import BytesIO
+    from tensorflow import Summary
+    fig.canvas.draw()
+    w, h = fig.canvas.get_width_height()
+    # get PNG data from the figure
+    png_buffer = BytesIO()
+    fig.canvas.print_png(png_buffer)
+    png_encoded = png_buffer.getvalue()
+    png_buffer.close()    
+    summary_image = Summary.Image(height=h, width=w, colorspace=4,  # RGB-A
+                                  encoded_image_string=png_encoded)
+    summary = Summary(value=[Summary.Value(tag=tag, image=summary_image)])
+    return summary
 
-def RestoreModelVariable(sess, model_path):
-    """Based on CnnModelClass.build_saver()
+
+
+def RestoreModel(sess, model_path, custom=False):
+    """Based on CnnModelClass.Classifier.build_saver()
     """
     print('-------------------------------------------')
     print('Restoring Model Variables...') 
     StartTime = datetime.now()
     # Use import_meta_graph to load meta data
-    saver = tf.train.import_meta_graph(model_path+'.meta')
-    saver.restore(sess, model_path)    
-    x_img = tf.get_collection("InputImg")[0] #placeholder
-    y_label = tf.get_collection("Inputlabel")[0] #placeholder
-    keep_prob = tf.get_collection("Dropout")[0] #placeholder
-    training = tf.get_collection("isTraining")[0] #placeholder 
-    output_propb = tf.get_collection("OutputPropb")[0]
-    output_label = tf.get_collection("OutputLabel")[0]
-    #graph = tf.get_default_graph() # find tensor name in graph   
-    #for op in graph.get_operations(): 
-    #   if 'Placeholder' in op.name: print(op.name)      
-    #keep_prob = graph.get_tensor_by_name('Fully-Connected-Layer-2/Placeholder:0')
-    EndTime = datetime.now() 
-    print ('Time usage : %s '%str(EndTime-StartTime))
-    print('-------------------------------------------')
-    return x_img, y_label, keep_prob, training, output_propb, output_label
-
-
-def RestoreModel(sess, model_path):
-    """Based on CnnModelClass.build_saver()
-    """
-    print('-------------------------------------------')
-    print('Restoring Model Variables...') 
-    StartTime = datetime.now()
-    # Use import_meta_graph to load meta data
-    saver = tf.train.import_meta_graph(model_path+'.meta')
-    saver.restore(sess, model_path)    
-    x_img = tf.get_collection("InputImg")[0] #placeholder
-    y_label = tf.get_collection("Inputlabel")[0] #placeholder
-    keep_prob = tf.get_collection("Dropout")[0] #placeholder
-    training = tf.get_collection("isTraining")[0] #placeholder 
-    output_propb = tf.get_collection("OutputPropb")[0]
-    output_label = tf.get_collection("OutputLabel")[0]
-    train_step = tf.get_collection("TrainSteps")[0]    
-    EndTime = datetime.now() 
-    print ('Time usage : %s '%str(EndTime-StartTime))
-    print('-------------------------------------------')
-    return sess,x_img, y_label, keep_prob, training, output_propb, output_label, train_step
+    saver = tf.train.import_meta_graph(model_path+'.meta')  
+    saver.restore(sess, model_path)
+    if custom:
+       EndTime = datetime.now() 
+       print ('Time usage : %s '%str(EndTime-StartTime))
+       print('-------------------------------------------')        
+       return sess, tf.get_default_graph()
+    else:
+       x_img = tf.get_collection("InputImg")[0] #placeholder
+       y_label = tf.get_collection("Inputlabel")[0] #placeholder
+       keep_prob = tf.get_collection("Dropout")[0] #placeholder
+       training = tf.get_collection("isTraining")[0] #placeholder 
+       output_prob = tf.get_collection("OutputProb")[0]
+       output_label = tf.get_collection("OutputLabel")[0]
+       train_step = tf.get_collection("TrainSteps")[0]  
+       EndTime = datetime.now() 
+       print ('Time usage : %s '%str(EndTime-StartTime))
+       print('-------------------------------------------')
+       return sess, x_img, y_label, keep_prob, training, output_prob, output_label, train_step
 
 
 def FreezeGraphToPB(sess,output_path,output_node=None):
@@ -101,7 +109,6 @@ def FreezeGraphToPB(sess,output_path,output_node=None):
     else: # Output 'get_collection' nodes name
        output_node_names = [n.name.split(':')[0] for n in output_node ]
        # ex.'Output-Classification-layer/y_fc_softmax/Softmax:0'
-
     # Freeze the graph
     frozen_graph_def = tf.graph_util.convert_variables_to_constants(
            sess,sess.graph_def,output_node_names)
@@ -116,7 +123,6 @@ def FreezeGraphToPB(sess,output_path,output_node=None):
     """# Save frozen .pb file method 2
     with tf.gfile.GFile(output_filename, "wb") as f:  
         f.write(frozen_graph_def.SerializeToString())""" 
-    #print (output_node_names)
 
 
 def LoadGraphFromPB(pbfile_path): 
@@ -136,29 +142,43 @@ def LoadGraphFromPB(pbfile_path):
     return graph
 
 
+def ShowPbInfo(pbfile_path, kwarg=''):
+    tf.reset_default_graph()    
+    graph = LoadGraphFromPB(pbfile_path)
+    for op in graph.get_operations():
+        if kwarg == '': 
+           print (op.name)
+        else:
+           if kwarg in op.name:
+              print (op) 
+
+
+# For the model generated before 20190206
 class OnlineModel(object):
     import ImgPreprocessSingle as ips 
     
     def __init__(self,mdpath):
-        self.mdpath = mdpath  
+        self.mdpath = [mdpath]  
         self.init_imgpath = os.path.join(os.getcwd(),'spapi','static','tf_models','init.png')        
 
         print('-------------------------------------------')    
         print('Online-Model init...')        
         StartTime = datetime.now()        
+        self.RestorePbModel(self.mdpath[0]) 
+        _, _ = self.pred(self.init_imgpath)
+        EndTime = datetime.now() 
+        print ('Time usage : %s '%str(EndTime-StartTime))
+        print('-------------------------------------------')
+        
+    def RestorePbModel(self, pbfile_path):        
         tf.reset_default_graph()
-        self.graph = LoadGraphFromPB(self.mdpath)
+        self.graph = LoadGraphFromPB(pbfile_path)
         self.x_img = self.graph.get_tensor_by_name('import/InputData/x_img:0')
         self.keep_prob = self.graph.get_tensor_by_name('import/dropout:0')
         self.output_prob = self.graph.get_tensor_by_name('import/Output-Classification-layer/output_softmax/Softmax:0')
         self.output_label = self.graph.get_tensor_by_name('import/ArgMax:0')
         self.sess = tf.Session()        
-        _, _ = self.pred(self.init_imgpath)        
-        EndTime = datetime.now() 
-        print ('Time usage : %s '%str(EndTime-StartTime))
-        print('-------------------------------------------')
-
-    
+        
     def pred(self, img_path, print_result=False):
         path = img_path  
         img = self.ips.img_preprocess(imgpath=path, savepath='', new_shape=(480,15), auto_flip=False, plot=False)    
@@ -176,6 +196,18 @@ class OnlineModel(object):
         else:        
            return None, None
 
+#For the model generated after 20190207
+class OnlineModelNew(OnlineModel):
+    
+    def RestorePbModel_new(self, pbfile_path):
+        tf.reset_default_graph()    
+        self.graph = LoadGraphFromPB(pbfile_path)
+        self.x_img = self.graph.get_tensor_by_name('import/InputData/x_img:0')
+        self.keep_prob = self.graph.get_tensor_by_name('import/dropout:0') 
+        self.output_prob = self.graph.get_tensor_by_name('import/OutputClassification_layer/softmax/Softmax:0')
+        self.output_label = self.graph.get_tensor_by_name('import/ArgMax_4:0')    
+        self.sess = tf.Session() 
+
 
 def ConfusionMatrixAnalysis(cm,f1_beta=1):
     """
@@ -189,7 +221,9 @@ def ConfusionMatrixAnalysis(cm,f1_beta=1):
     cm_sum_diagonal = np.sum(np.diagonal(cm))
     cm_acc = cm_sum_diagonal/cm_total
     
-    precision = np.asarray([ cm[i,i]/np.sum(cm[:,i]) for i in range(label_size) ])
+    precision = np.asarray([ (cm[i,i] if cm[i,i] != 0 else 1e-7  ) / ( np.sum(cm[:,i]) if np.sum(cm[:,i]) != 0 else 1 ) \
+                            for i in range(label_size) ])
+    
     recall = np.asarray([ cm[i,i]/np.sum(cm[i,:]) for i in range(label_size) ])
     f1_score = (1+f1_beta**2)*(precision*recall/(f1_beta**2*precision+recall))#beta=1
     support = np.sum(cm,axis=1)
@@ -225,6 +259,7 @@ def ConfusionMatrixAnalysis(cm,f1_beta=1):
     report +="      %5d \n"%(np.sum(support))
 
     result = {"report":report,
+              "weighted_avg":[weighted_precision,weighted_recall,weighted_f1_score],
               "precision":precision,
               "recall":recall,
               "f1_score":f1_score,
@@ -242,22 +277,11 @@ if __name__ == '__main__':
                                         'colab_201901040210',
                                         'MyDataV1_m2') 
    output_path = modelpath+".pb"
-   x_img, y_label, keep_prob, training, output_propb, output_label = RestoreModelVariable(sess,modelpath)    
-   FreezeGraphToPB(sess,output_path,output_node=[output_label,output_propb])
+
    sess.close()
 
-   """
-   ###########################################################
-   graph = LoadGraphFromPB(output_path)
-   #for op in graph.get_operations():
-   #    print(op.name)  
-   x_img = graph.get_tensor_by_name('import/InputData/x_img:0')
-   keep_prob =graph.get_tensor_by_name('import/dropout:0')
-   training = graph.get_tensor_by_name('import/training:0') 
-   output_propb = graph.get_tensor_by_name('import/Output-Classification-layer/output_softmax/Softmax:0')
-   output_label = graph.get_tensor_by_name('import/ArgMax:0')
-   ###########################################################
-   """
+
+
 
 
 
