@@ -9,48 +9,22 @@ from django.shortcuts import render
 from django.core.files.storage import FileSystemStorage
 from PIL import Image
 import os
-import tensorflow as tf
-import ImgPreprocessSingle as ips
    
-# Pre-load .pb file 
-from ModelTools import LoadGraphFromPB
-pbfile_path = os.path.join(os.getcwd(),'OutputModel',
-                           'colab_201901040210',                                        
-                           'MyDataV1_m2.pb')     
-tf.reset_default_graph()
-graph = LoadGraphFromPB(pbfile_path)
-x_img = graph.get_tensor_by_name('import/InputData/x_img:0')
-keep_prob =graph.get_tensor_by_name('import/dropout:0')
-output_prob = graph.get_tensor_by_name('import/Output-Classification-layer/output_softmax/Softmax:0')
-output_label = graph.get_tensor_by_name('import/ArgMax:0')
-sess = tf.Session()
-
-
-def pred(sess,img_path):
-    path = img_path  
-    img = ips.img_preprocess(imgpath=path, savepath='', new_shape=(480,15), auto_flip=False, plot=False)    
-    if img is not '': 
-       image_shape = img.shape 
-       img = img.reshape((-1, image_shape[0], image_shape[1], 3))           
-       label, prob = sess.run([output_label,output_prob], 
-                               feed_dict = {x_img: img*(1./255), 
-                                            keep_prob: 1.0})              
-       print('PredLabel   =', label[0])
-       print('Probability =',['%.2f'%(p) for p in prob[0]],'\n')
-       return label[0], prob[0]
-    else:        
-       return None, None
+###################################################################
+from ModelTools import OnlineModel
+mdApath = os.path.join(os.getcwd(),'spapi','static','tf_models',                      
+                      'co_7_201901040210','MyDataV1_m2.pb') 
+model = OnlineModel(mdApath)
+####################################################################
     
-
 def vali_uploadimg(path):
-    # Check the uploaded file is img or not.
-    try :	
+    try :
+       if path.endswith(('.tiff','.tif')): return False
        img = Image.open(path)
        img.close()
        return True
     except Exception as e:
-       return False  
-   
+       return False    
 
 def Home(request): 
     upload_state = ''
@@ -81,13 +55,12 @@ def Home(request):
               <div style=""> 
 		           <img style="width: 480px; height: 150px;" src="%s" alt="image" />         
               </div>                                   
-              """%(filename,fs.url(filename))
-              
-              # Run pred. process
+              """%(filename,fs.url(filename))           
               try :                 
-                label, prob = pred(sess, filepath)
-                if label == None: raise ValueError('False of img_preprocess')                    
-
+                label, prob = model.pred(filepath,print_result=True)
+                if label == None: raise ValueError('False of img_preprocess')                                       
+                prob_max = max(prob)
+                if prob_max < 0.2143: label = 'unknown'
                 recognize_result = """               
                 <span style="text-align: center; margin:0px auto; color: green;">
                   Recognized Result</span><br>
@@ -95,7 +68,7 @@ def Home(request):
                   label = %s <br>
                   probability = %.3f
                 </div>                   
-                """%(str(label),max(prob))                                                
+                """%(str(label),prob_max)                                                
               except Exception as e:
                 print (e)
                 recognize_result = """               
@@ -104,8 +77,7 @@ def Home(request):
                 <div style="text-align: center; color: red;">                        
                   ERROR : %s
                 </div>                   
-                """%(e)                 
-
+                """%(e)               
            else: 
               os.remove(filepath)
               upload_state = """
